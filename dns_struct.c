@@ -1,12 +1,13 @@
 #include "dns_struct.h"
 
+/* 从buffer中读取指定位数的数据，并转换为主机字节顺序 */
 size_t get_bits(uint8_t** buffer, int bits) {
     if (buffer == NULL || *buffer == NULL) {
         fprintf(stderr, "Error: buffer is NULL.\n");
         exit(EXIT_FAILURE);
     }
 
-    /* ntohs：网络字节顺序转换为主机字节顺序 */
+    /* 根据位数读取数据，并转换为主机字节顺序 */
     if (bits == 8) {
         uint8_t val;
         memcpy(&val, *buffer, 1);
@@ -28,13 +29,14 @@ size_t get_bits(uint8_t** buffer, int bits) {
     }
 }
 
+/* 将指定位数的数据写入buffer，并转换为网络字节顺序 */
 void set_bits(uint8_t** buffer, int bits, int value) {
     if (buffer == NULL || *buffer == NULL) {
         fprintf(stderr, "Error: buffer is NULL.\n");
         exit(EXIT_FAILURE);
     }
 
-    /* htons：主机字节顺序转换为网络字节顺序 */
+    /* 根据位数写入数据，并转换为网络字节顺序 */
     if (bits == 8) {
         uint8_t val = (uint8_t)value;
         memcpy(*buffer, &val, 1);
@@ -53,13 +55,14 @@ void set_bits(uint8_t** buffer, int bits, int value) {
     }
 }
 
-/* 把得到的DNS报文存到报头结构体 */
+/* 从buffer中解析DNS报文头，存入dns_message结构体 */
 uint8_t* get_header(dns_message* msg, uint8_t* buffer) {
     if (msg == NULL || buffer == NULL) {
         fprintf(stderr, "Error: msg or buffer is NULL.\n");
         exit(EXIT_FAILURE);
     }
 
+    /* 解析DNS报文头的各个字段 */
     msg->header->id = get_bits(&buffer, 16);
 
     uint16_t val = get_bits(&buffer, 16);
@@ -83,7 +86,7 @@ uint8_t* get_header(dns_message* msg, uint8_t* buffer) {
     return buffer;
 }
 
-/* 把报文头结构体存为网络字节序 */
+/* 将DNS报文头存入buffer，准备发送 */
 uint8_t* set_header(dns_message* msg, uint8_t* buffer, uint8_t* ip_addr) {
     if (msg == NULL || buffer == NULL || ip_addr == NULL) {
         fprintf(stderr, "Error: msg, buffer, or ip_addr is NULL.\n");
@@ -91,7 +94,7 @@ uint8_t* set_header(dns_message* msg, uint8_t* buffer, uint8_t* ip_addr) {
     }
 
     dns_header* header = msg->header;
-    header->qr = 1;        // 回答报文为1
+    header->qr = 1;        // 回答报文
     header->aa = 1;        // 权威域名服务器
     header->ra = 1;        // 可用递归
     header->anCount = 1;   // 1个回复
@@ -99,6 +102,7 @@ uint8_t* set_header(dns_message* msg, uint8_t* buffer, uint8_t* ip_addr) {
     /* 若查到0.0.0.0，则该域名被屏蔽 */
     header->rcode = (ip_addr[0] == 0 && ip_addr[1] == 0 && ip_addr[2] == 0 && ip_addr[3] == 0) ? 3 : 0;
 
+    /* 将各个字段写入buffer */
     set_bits(&buffer, 16, header->id);
 
     int flags = 0;
@@ -119,6 +123,7 @@ uint8_t* set_header(dns_message* msg, uint8_t* buffer, uint8_t* ip_addr) {
     return buffer;
 }
 
+/* 从buffer中解析DNS问题部分，存入dns_message结构体 */
 uint8_t* get_question(dns_message* msg, uint8_t* buffer, uint8_t* start) {
     if (msg == NULL || buffer == NULL || start == NULL) {
         fprintf(stderr, "Error: msg, buffer, or start is NULL.\n");
@@ -134,7 +139,7 @@ uint8_t* get_question(dns_message* msg, uint8_t* buffer, uint8_t* start) {
             exit(EXIT_FAILURE);
         }
 
-        /* 从DNS报文中获取查询域名*/
+        /* 从DNS报文中获取查询域名 */
         buffer = get_domain(buffer, name, start);
 
         p->q_name = malloc(strlen(name) + 1);
@@ -159,6 +164,7 @@ uint8_t* get_question(dns_message* msg, uint8_t* buffer, uint8_t* start) {
     return buffer;
 }
 
+/* 将DNS问题部分存入buffer，准备发送 */
 uint8_t* set_question(dns_message* msg, uint8_t* buffer) {
     if (msg == NULL || buffer == NULL) {
         fprintf(stderr, "Error: msg or buffer is NULL.\n");
@@ -176,6 +182,7 @@ uint8_t* set_question(dns_message* msg, uint8_t* buffer) {
     return buffer;
 }
 
+/* 从buffer中解析DNS答案部分，存入dns_message结构体 */
 uint8_t* get_answer(dns_message* msg, uint8_t* buffer, uint8_t* start) {
     if (msg == NULL || buffer == NULL || start == NULL) {
         fprintf(stderr, "Error: msg, buffer, or start is NULL.\n");
@@ -191,7 +198,7 @@ uint8_t* get_answer(dns_message* msg, uint8_t* buffer, uint8_t* start) {
             exit(EXIT_FAILURE);
         }
 
-        /* 从DNS报文中获取查询域名*/
+        /* 从DNS报文中获取查询域名 */
         buffer = get_domain(buffer, name, start);
 
         p->name = malloc(strlen(name) + 1);
@@ -226,19 +233,23 @@ uint8_t* get_answer(dns_message* msg, uint8_t* buffer, uint8_t* start) {
     return buffer;
 }
 
+/* 将DNS答案部分存入buffer，准备发送 */
 uint8_t* set_answer(dns_message* msg, uint8_t* buffer, uint8_t* ip_addr) {
     if (msg == NULL || buffer == NULL || ip_addr == NULL) {
         fprintf(stderr, "Error: msg, buffer, or ip_addr is NULL.\n");
         exit(EXIT_FAILURE);
     }
 
+    /* 将查询域名存入buffer */
     buffer = set_domain(buffer, msg->questions->q_name);
 
+    /* 将各个字段写入buffer */
     set_bits(&buffer, 16, 1);    // type
     set_bits(&buffer, 16, 1);    // rr_class
     set_bits(&buffer, 32, 4);    // ttl
     set_bits(&buffer, 16, 4);    // rd_length
 
+    /* 写入IPv4地址 */
     int i;
     for (i = 0; i < 4; i++) {
         *buffer = ip_addr[i];
@@ -248,6 +259,7 @@ uint8_t* set_answer(dns_message* msg, uint8_t* buffer, uint8_t* ip_addr) {
     return buffer;
 }
 
+/* 从buffer中解析域名 */
 uint8_t* get_domain(uint8_t* buffer, char* name, uint8_t* start) {
     if (buffer == NULL || name == NULL || start == NULL) {
         fprintf(stderr, "Error: buffer, name, or start is NULL.\n");
@@ -257,12 +269,14 @@ uint8_t* get_domain(uint8_t* buffer, char* name, uint8_t* start) {
     uint8_t* ptr = buffer;
     int i = 0, len = 0;
 
+    /* 如果是指针，则获取偏移量，并递归调用 */
     if (*ptr >= 0xc0) {
         uint16_t offset = ((*ptr & 0x3f) << 8) | *(ptr + 1);
         get_domain(start + offset, name, start);
         return buffer + 2;
     }
 
+    /* 循环读取域名 */
     while (1) {
         uint8_t val = *ptr;
         ptr++;
@@ -281,6 +295,7 @@ uint8_t* get_domain(uint8_t* buffer, char* name, uint8_t* start) {
         }
     }
 
+    /* 如果是指针，则获取偏移量，并递归调用 */
     if (*ptr >= 0xc0) {
         char name2[MAX_SIZE] = { 0 };
         uint16_t offset = ((*ptr & 0x3f) << 8) + *(ptr + 1); // 获取后14位偏移量
@@ -294,6 +309,7 @@ uint8_t* get_domain(uint8_t* buffer, char* name, uint8_t* start) {
     return ptr;
 }
 
+/* 将域名写入buffer */
 uint8_t* set_domain(uint8_t* buffer, char* name) {
     if (buffer == NULL || name == NULL) {
         fprintf(stderr, "Error: buffer or name is NULL.\n");
@@ -304,6 +320,7 @@ uint8_t* set_domain(uint8_t* buffer, char* name) {
     char tmp[MAX_SIZE] = { 0 };
     int i = 0;
 
+    /* 循环写入域名 */
     while (1) {
         if (*ptr == 0) {
             *buffer = i;
@@ -330,14 +347,14 @@ uint8_t* set_domain(uint8_t* buffer, char* name) {
     return buffer;
 }
 
-/* 解析收到的报文 */
+/* 解析收到的DNS报文 */
 void get_message(dns_message* msg, uint8_t* buffer, uint8_t* start) {
     if (msg == NULL || buffer == NULL || start == NULL) {
         fprintf(stderr, "Error: msg, buffer, or start is NULL.\n");
         exit(EXIT_FAILURE);
     }
 
-    /* 开辟空间 */
+    /* 分配空间 */
     msg->header = malloc(sizeof(dns_header));
     if (msg->header == NULL) {
         fprintf(stderr, "Error: Memory allocation failed for dns_header.\n");
@@ -348,16 +365,16 @@ void get_message(dns_message* msg, uint8_t* buffer, uint8_t* start) {
     msg->answers = NULL;
 
     /* 获取报文头 */
-    buffer = get_header(msg, buffer);    // buffer指向读取完报头后的地址 
+    buffer = get_header(msg, buffer);
 
     /* 获取询问内容 */
-    buffer = get_question(msg, buffer, start);    // buffer指向读取完报头后的地址 
+    buffer = get_question(msg, buffer, start);
 
     /* 获取应答内容 */
-    buffer = get_answer(msg, buffer, start);    // buffer指向读取完报头后的地址 
+    buffer = get_answer(msg, buffer, start);
 }
 
-/* 组装将要发出的报文，只发给客户端 */
+/* 组装将要发出的DNS报文 */
 uint8_t* set_message(dns_message* msg, uint8_t* buffer, uint8_t* ip_addr) {
     if (msg == NULL || buffer == NULL || ip_addr == NULL) {
         fprintf(stderr, "Error: msg, buffer, or ip_addr is NULL.\n");
@@ -374,6 +391,7 @@ uint8_t* set_message(dns_message* msg, uint8_t* buffer, uint8_t* ip_addr) {
     return buffer;
 }
 
+/* 释放DNS报文所占用的内存 */
 void free_message(dns_message* msg) {
     if (msg == NULL) {
         return;

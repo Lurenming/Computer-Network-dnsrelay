@@ -21,14 +21,16 @@
     后面三个部分由结构体DNS_resource_record存储
 */
 
+/* DNS 报文结构体 */
 typedef struct DNS_message {
-    struct DNS_header* header;
-    struct DNS_question* questions;
-    struct DNS_resource_record* answers;
-    struct DNS_resource_record* authorities;
-    struct DNS_resource_record* additionals;
+    struct DNS_header* header;                 // DNS 报文头
+    struct DNS_question* questions;            // 查询请求
+    struct DNS_resource_record* answers;       // 查询回复
+    struct DNS_resource_record* authorities;   // 授权域名服务器
+    struct DNS_resource_record* additionals;   // 附加信息
 } dns_message;
 
+/* DNS 报文头结构体 */
 typedef struct DNS_header {
     uint16_t id; // 标识符，一对DNS查询和恢复的ID相同 
 
@@ -49,15 +51,17 @@ typedef struct DNS_header {
     uint16_t arCount; // 附加数
 } dns_header;
 
+/* DNS 查询结构体 */
 typedef struct DNS_question {
     char* q_name;              // 域名或IP地址
     uint16_t q_type;           // 资源类型
     uint16_t q_class;          // 地址类型，通常为1
-    struct DNS_question* next;
+    struct DNS_question* next; // 指向下一个查询问题的指针
 } dns_question;
 
+/* 资源数据联合体 */
 union ResourceData {
-    /* IPv4 */
+    /* IPv4 记录 */
     struct {
         uint8_t IP_addr[4];
     } a_record;
@@ -73,22 +77,24 @@ union ResourceData {
         uint32_t minimum;   // 默认生存时间
     } soa_record;
 
-    /* cname规范名称记录 */
+    /* CNAME 规范名称记录 */
     struct {
         char* name;
     } cname_record;
 };
 
+/* DNS 资源记录结构体 */
 typedef struct DNS_resource_record {
     char* name;                  // 域名
-    uint16_t type;               // resource data类型
+    uint16_t type;               // 资源数据类型
     uint16_t rr_class;           // 仅支持1，IN，因特网
     uint32_t ttl;                // 期望此RR被缓存的时间
     uint16_t rd_length;          // RDATA部分的长度
     union ResourceData rd_data;  // 资源内容
-    struct DNS_resource_record* next;
+    struct DNS_resource_record* next; // 指向下一个资源记录的指针
 } dns_rr;
 
+/* 记录结构体，用于其他用途 */
 typedef struct record {
     uint8_t addr[16];
     char* txt_data;
@@ -103,28 +109,41 @@ static const uint32_t RD_MASK = 0x0100;
 static const uint32_t RA_MASK = 0x0080;
 static const uint32_t RCODE_MASK = 0x000F;
 
+/* 从buffer中读取指定位数的数据 */
 size_t get_bits(uint8_t** buffer, int bits);
 
+/* 将指定位数的数据写入buffer */
 void set_bits(uint8_t** buffer, int bits, int value);
 
+/* 从buffer中解析域名 */
 uint8_t* get_domain(uint8_t* buffer, char* name, uint8_t* start);
 
+/* 将域名写入buffer */
 uint8_t* set_domain(uint8_t* buffer, char* name);
 
+/* 解析收到的DNS报文 */
 void get_message(dns_message* msg, uint8_t* buffer, uint8_t* start);
 
+/* 组装将要发出的DNS报文 */
 uint8_t* set_message(dns_message* msg, uint8_t* buffer, uint8_t* ip_addr);
 
+/* 从buffer中解析DNS报文头 */
 uint8_t* get_header(dns_message* msg, uint8_t* buffer);
 
+/* 将DNS报文头写入buffer */
 uint8_t* set_header(dns_message* msg, uint8_t* buffer, uint8_t* ip_addr);
 
+/* 从buffer中解析DNS问题部分 */
 uint8_t* get_question(dns_message* msg, uint8_t* buffer, uint8_t* start);
 
+/* 将DNS问题部分写入buffer */
 uint8_t* set_question(dns_message* msg, uint8_t* buffer);
 
+/* 从buffer中解析DNS答案部分 */
 uint8_t* get_answer(dns_message* msg, uint8_t* buffer, uint8_t* start);
 
-uint8_t* get_answer(dns_message* msg, uint8_t* buffer, uint8_t* ip_addr);
+/* 将DNS答案部分写入buffer */
+uint8_t* set_answer(dns_message* msg, uint8_t* buffer, uint8_t* ip_addr);
 
+/* 释放DNS报文所占用的内存 */
 void free_message(dns_message* msg);
