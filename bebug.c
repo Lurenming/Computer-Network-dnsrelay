@@ -65,14 +65,6 @@ void print_answer(dns_message* msg) {
                 printf("minimum: %u", answer->rd_data.soa_record.minimum);
                 break;
             }
-            case RR_AAAA: {
-                printf("AAAA Record: ");
-                for (int j = 0; j < 15; j++) {
-                    printf("%02x:", answer->rd_data.a_record.IP_addr[j]);
-                }
-                printf("%02x", answer->rd_data.a_record.IP_addr[15]);
-                break;
-            }
             // 可以添加其他资源记录类型的打印信息
             default:
                 printf("Unknown Record Type");
